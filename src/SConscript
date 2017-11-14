@@ -1,0 +1,47 @@
+#-------------------------------------------------------------------------------
+#
+#     qudp library build construction script
+#
+import os
+
+#-------------------------------------------------------------------------------
+#
+#     General
+#
+Import('env')
+
+env = env.Clone()
+Platform = env['PLATFORM']
+
+#-------------------------------------------------------------------------------
+#
+#     Setup sources and target
+#
+
+Sources = ['qudp.cpp', 'qudp_lib.cpp', 'qudp.h']
+Target  = os.path.join(env['LIB'], 'qudp')
+
+
+#-------------------------------------------------------------------------------
+#
+#     Setup local construction environment
+#
+env.EnableQt5Modules(['QtTest', 'QtNetwork'])
+
+DEFINES = ['ENA_FW_QT']
+
+if Platform == 'win32':
+    DEFINES += ['ENA_WIN_API']
+
+env.Append(CXXFLAGS = ['-D'+ d for d in DEFINES] )
+
+
+#-------------------------------------------------------------------------------
+#
+#     Build the target
+#
+
+lib = env.StaticLibrary(Target, Sources)
+
+#-------------------------------------------------------------------------------
+
