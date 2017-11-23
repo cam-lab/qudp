@@ -17,7 +17,7 @@ Platform = env['PLATFORM']
 #
 #     Setup sources and target
 #
-Sources = ['qudp.cpp', 'qudp_lib.cpp', 'qudp.h']
+Sources = ['qudp.cpp', 'qudp_lib.cpp']
 Target  = os.path.join(env['LIBPATH'], env['PRODUCT_NAME'])
 
 
@@ -25,7 +25,7 @@ Target  = os.path.join(env['LIBPATH'], env['PRODUCT_NAME'])
 #
 #     Setup local construction environment
 #
-env.EnableQt5Modules(['QtTest', 'QtNetwork'])
+env.EnableQt5Modules(['QtTest', 'QtNetwork', 'QtCore'])
 
 DEFINES = ['ENA_FW_QT']
 
