@@ -1,0 +1,50 @@
+#-------------------------------------------------------------------------------
+#
+#     qudp test utilites build construction script
+#
+import os
+
+#-------------------------------------------------------------------------------
+#
+#     General
+#
+Import('env')
+
+env = env.Clone()
+Platform = env['PLATFORM']
+
+#-------------------------------------------------------------------------------
+#
+#     Setup sources and target
+#
+srcRx  = ['common/RawStreamTester.cpp', 'test_rx/main.cpp']
+srcTx  = ['common/RawStreamTester.cpp', 'test_tx/main.cpp']
+trgRx  = os.path.join(env['BINDIR'], env['PRODUCT_NAME'] + '_test_rx')
+trgTx  = os.path.join(env['BINDIR'], env['PRODUCT_NAME'] + '_test_tx')
+
+#-------------------------------------------------------------------------------
+#
+#     Setup local construction environment
+#
+env.EnableQt5Modules(['QtTest', 'QtNetwork', 'QtCore'])
+
+DEFINES = [] #'ENA_FW_QT']
+
+if Platform == 'win32':
+    DEFINES += ['ENA_WIN_API']
+    env.Append(LIBS=['ws2_32'])
+
+env.Append(CCFLAGS = ['-D'+ d for d in DEFINES] )
+env.Append(LIBS=['qudp'])
+
+#-------------------------------------------------------------------------------
+#
+#     Build the targets
+#
+rx = env.Program( trgRx, srcRx ) 
+tx = env.Program( trgTx, srcTx ) 
+
+Return('rx tx')
+
+#-------------------------------------------------------------------------------
+
