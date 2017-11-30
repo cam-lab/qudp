@@ -117,7 +117,7 @@ bool TSocket::socketInit()
             }
         #endif
     }
-    mStatus = UDP_LIB::Ok;
+    //mStatus = UDP_LIB::Ok;
     return true;
 }
 
