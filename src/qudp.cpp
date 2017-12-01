@@ -62,6 +62,7 @@ TSocket::TSocket(unsigned long hostAddr, unsigned hostPort, const UDP_LIB::TPara
                                 mParams(params),
                                 mDrvSem(),
                                 mAppSem(),
+                                mInitSem(),
                                 mSubmitQueue(),
                                 mReadyQueue(),
                                 mColdStartCompleted(false),
@@ -122,6 +123,26 @@ bool TSocket::socketInit()
 }
 
 //------------------------------------------------------------------------------
+bool TSocket::threadStart()
+{
+    QThread::start(QThread::Priority(mParams.threadPriority));
+    bool initStatus = mInitSem.tryAcquire(1, INIT_TIMEOUT);
+    if(initStatus == false ) {
+        mStatus = UDP_LIB::SocketCreationError;
+        #if defined(QUDP_PRINT_DEBUG_ERROR)
+            if(getDir() == UDP_LIB::Receive) {
+                qDebug() << "E: [TSocket::threadStart] rx" << TSocketWrapper::fullAddrTxt(mHostAddr,mHostPort);
+            }
+            if(getDir() == UDP_LIB::Transmit) {
+                qDebug() << "E: [TSocket::threadStart] tx" << TSocketWrapper::fullAddrTxt(mHostAddr,mHostPort);
+            }
+        #endif
+    }
+    return initStatus;
+}
+
+
+//------------------------------------------------------------------------------
 void TSocket::run()
 {
     if(!socketInit()) {
@@ -130,11 +151,20 @@ void TSocket::run()
         #endif
         return;
     }
+
+    //---
+    mInitSem.release();
+    if(mStatus != UDP_LIB::SocketCreationError) {
+        mStatus = UDP_LIB::Ok;
+    }
+
     while(!mExit && (mStatus == UDP_LIB::Ok) && onExec()) {
         // main thread loop
     }
 
-    mStatus = UDP_LIB::NotInitialized;
+    if(mStatus != UDP_LIB::SocketCreationError) {
+        mStatus = UDP_LIB::NotInitialized;
+    }
     mSocket->close();
     delete mSocket;
     mSocket = 0;
@@ -321,17 +351,17 @@ bool TSocketRx::socketInit()
         #endif
     }
 
-    mStatus = UDP_LIB::Ok;
+    //mStatus = UDP_LIB::Ok;
     return true;
 }
 
 //------------------------------------------------------------------------------
-void TSocketRx::threadStart()
+bool TSocketRx::threadStart()
 {
     for(auto& transfer : mTransferPool) {
         submitTransfer(transfer);
     }
-    TSocket::threadStart();
+    return TSocket::threadStart();
 }
 
 //------------------------------------------------------------------------------
@@ -496,7 +526,7 @@ bool TSocketTx::socketInit()
         #endif
 
         #if defined(QUDP_PRINT_DEBUG_INFO)
-            qDebug() << "[INFO] [TSocketTx] [SendBufferSizeSocketOption]" << TSocketWrapper::fullAddrTxt(mHostAddr,mHostPort) << socketBufSize << getSocketBufSize();
+            qDebug() << "[INFO] [TSocketTx::socketInit] [SendBufferSizeSocketOption]" << TSocketWrapper::fullAddrTxt(mHostAddr,mHostPort) << socketBufSize << getSocketBufSize();
         #endif
         #if defined(QUDP_PRINT_DEBUG_ERROR)
           #if defined(Q_OS_WIN)
@@ -504,23 +534,23 @@ bool TSocketTx::socketInit()
           #else
             if(socketBufSize != getSocketBufSize()*2) {
           #endif
-                qDebug() << "[ERROR] [TSocketTx] [SendBufferSizeSocketOption]" << TSocketWrapper::fullAddrTxt(mHostAddr,mHostPort) << socketBufSize << getSocketBufSize();
+                qDebug() << "[ERROR] [TSocketTx::socketInit] [SendBufferSizeSocketOption]" << TSocketWrapper::fullAddrTxt(mHostAddr,mHostPort) << socketBufSize << getSocketBufSize();
             }
         #endif
     }
     /* try use write() instead sendDatagram, but result the same */ //mSocket->connectToHost(QHostAddress(mParams.peerAddr), mParams.peerPort);
     connect(mSocket,&QIODevice::bytesWritten,this,&TSocketTx::bytesWritten,Qt::DirectConnection);
-    mStatus = UDP_LIB::Ok;
+    //mStatus = UDP_LIB::Ok;
     return true;
 }
 
 //------------------------------------------------------------------------------
-void TSocketTx::threadStart()
+bool TSocketTx::threadStart()
 {
     for(auto& transfer : mTransferPool) {
         sendToReadyQueue(transfer,false);
     }
-    TSocket::threadStart();
+    return TSocket::threadStart();
 }
 
 //------------------------------------------------------------------------------
@@ -633,7 +663,7 @@ bool TSocketTx::onExec()
 //------------------------------------------------------------------------------
 TSocketWrapper* TSocketWrapper::createSocket(unsigned long hostAddr, unsigned hostPort, const UDP_LIB::TParams* rxParams, const UDP_LIB::TParams* txParams, UDP_LIB::TStatus& status)
 {
-     status = UDP_LIB::Ok;
+    status = UDP_LIB::Ok;
     TSocketWrapper* wrapper = new TSocketWrapper(hostAddr,hostPort,rxParams,txParams);
     if(wrapper->mSocketRx && (wrapper->mSocketRx->getStatus() != UDP_LIB::Ok))
         status = wrapper->mSocketRx->getStatus();
@@ -674,15 +704,19 @@ TSocketWrapper::~TSocketWrapper()
 }
 
 //------------------------------------------------------------------------------
-void TSocketWrapper::socketStart()
+int TSocketWrapper::socketStart()
 {
+    int status = 0;
     //---
     if(mSocketRx) {
-        mSocketRx->threadStart();
+        if(!mSocketRx->threadStart())
+            status |= RX_PART_SIGNATURE;
     }
     if(mSocketTx) {
-        mSocketTx->threadStart();
+        if(!mSocketTx->threadStart())
+            status |= TX_PART_SIGNATURE;
     }
+    return status;
 }
 
 //------------------------------------------------------------------------------
@@ -895,8 +929,11 @@ UDP_LIB::TStatus TSocketPool::createSocket(unsigned long hostAddr, unsigned host
 
     //---
     getPool().insert(std::pair<uint64_t,TSocketWrapper*>(getHostAddr64(hostAddr,hostPort),socketWrapper));
-    socketWrapper->socketStart(); // to prevent calling Tx callback before inserting socket in pool
-    return UDP_LIB::Ok;
+    if(socketWrapper->socketStart() == 0x00) { // to prevent calling Tx callback before inserting socket in pool
+        return UDP_LIB::Ok;
+    } else {
+        return UDP_LIB::SocketCreationError;
+    }
 }
 
 //------------------------------------------------------------------------------
