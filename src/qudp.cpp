@@ -708,13 +708,35 @@ int TSocketWrapper::socketStart()
 {
     int status = 0;
     //---
+
+
     if(mSocketRx) {
+        #if defined(QUDP_PRINT_DEBUG_INFO)
+            QElapsedTimer timer;
+            timer.start();
+        #endif
         if(!mSocketRx->threadStart())
             status |= RX_PART_SIGNATURE;
+        #if defined(QUDP_PRINT_DEBUG_INFO)
+            if(status)
+                qDebug() << "E: socket (rx)" << qPrintable(QString::number(mSocketRx->getHostAddr(),16)) << ":" << mSocketRx->getHostPort() << "start timeout expired" << TSocket::INIT_TIMEOUT;
+            else
+                qDebug() << "I: socket (rx)" << qPrintable(QString::number(mSocketRx->getHostAddr(),16)) << ":" << mSocketRx->getHostPort() << "start time:" << timer.elapsed();
+        #endif
     }
     if(mSocketTx) {
+        #if defined(QUDP_PRINT_DEBUG_INFO)
+            QElapsedTimer timer;
+            timer.start();
+        #endif
         if(!mSocketTx->threadStart())
             status |= TX_PART_SIGNATURE;
+        #if defined(QUDP_PRINT_DEBUG_INFO)
+            if(status)
+                qDebug() << "E: socket (tx)" << qPrintable(QString::number(mSocketTx->getHostAddr(),16)) << ":" << mSocketTx->getHostPort() << "start timeout expired" << TSocket::INIT_TIMEOUT;
+            else
+                qDebug() << "I: socket (tx)" << qPrintable(QString::number(mSocketTx->getHostAddr(),16)) << ":" << mSocketTx->getHostPort() << "start time:" << timer.elapsed();
+        #endif
     }
     return status;
 }
