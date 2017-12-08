@@ -62,7 +62,7 @@ class TSocket : public QThread
         typedef TQueue<UDP_LIB::Transfer,TQueueSl,TQtReadWriteLockGuard> TJobQueue;
 
         //---
-        static const int INIT_TIMEOUT = 5000;
+        static const int INIT_TIMEOUT = 10000;
 
         //---
         volatile bool      mExit;        // TODO: check - is it need to do it atomic?
