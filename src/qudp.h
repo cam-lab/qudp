@@ -62,6 +62,9 @@ class TSocket : public QThread
         typedef TQueue<UDP_LIB::Transfer,TQueueSl,TQtReadWriteLockGuard> TJobQueue;
 
         //---
+        static const int INIT_TIMEOUT = 10000;
+
+        //---
         volatile bool      mExit;        // TODO: check - is it need to do it atomic?
         UDP_LIB::TStatus   mStatus;
         unsigned long      mHostAddr;
@@ -70,6 +73,7 @@ class TSocket : public QThread
         UDP_LIB::TParams   mParams;
         QSemaphore         mDrvSem;
         QSemaphore         mAppSem;
+        QSemaphore         mInitSem;
         TJobQueue          mSubmitQueue;
         TJobQueue          mReadyQueue;
         bool               mColdStartCompleted;
@@ -89,7 +93,7 @@ class TSocket : public QThread
         std::vector<UDP_LIB::Transfer>   mTransferPool;
 
         //---
-        virtual void threadStart() { QThread::start(QThread::Priority(mParams.threadPriority)); }
+        virtual bool threadStart();
         virtual void run() Q_DECL_OVERRIDE;
         virtual bool onExec() { return false; }
         bool threadFinish(unsigned timeout);
@@ -118,7 +122,7 @@ class TSocketRx : public TSocket
         static unsigned const  MAX_RCV_BUFFERS       = 1000;
 
         virtual bool socketInit();
-        virtual void threadStart();
+        virtual bool threadStart();
         virtual bool onExec();
 };
 
@@ -146,7 +150,7 @@ class TSocketTx : public TSocket
         qint64       mBytesSent;
 
         virtual bool socketInit();
-        virtual void threadStart();
+        virtual bool threadStart();
         virtual bool onExec();
         unsigned timeout() const { return mColdStartCompleted ? SOCKET_TIMEOUT_TX : SOCKET_TIMEOUT_TX_START; }
 };
@@ -156,11 +160,14 @@ class TSocketTx : public TSocket
 class TSocketWrapper
 {
     public:
+        static const int RX_PART_SIGNATURE = 0x01;
+        static const int TX_PART_SIGNATURE = 0x02;
+
         static QString fullAddrTxt(unsigned long hostAddr, unsigned hostPort) { return QString::number(hostAddr,16) + QString(":") + QString::number(hostPort); }
 
         static TSocketWrapper* createSocket(unsigned long hostAddr, unsigned hostPort, const UDP_LIB::TParams* rxParams, const UDP_LIB::TParams* txParams, UDP_LIB::TStatus& status);
         ~TSocketWrapper();
-        void socketStart();
+        int socketStart();
         UDP_LIB::TStatus submitTransfer(UDP_LIB::TDirection dir, UDP_LIB::Transfer& transfer);
         UDP_LIB::TStatus getTransfer(UDP_LIB::TDirection dir, UDP_LIB::Transfer& transfer, unsigned timeout = INFINITE);
         unsigned getReadyTransferNum(UDP_LIB::TDirection dir) const;
