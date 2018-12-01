@@ -1,7 +1,7 @@
 TEMPLATE    = lib
 TARGET      = qudp
 
-CONFIG     += staticlib
+#CONFIG     += staticlib
 
 PRJ_DIR      = ..
 
@@ -24,5 +24,10 @@ DEFINES += ENA_FW_QT
 
 win32 {
     DEFINES += ENA_WIN_API
-    #LIBS    += -lws2_32
+    contains(CONFIG,staticlib) {
+        message(staticlib build)
+    } else {
+        message(dynamiclib build)
+        LIBS += -lws2_32
+    }
 }
